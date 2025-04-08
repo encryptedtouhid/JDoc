@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch, nextTick } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { common, createLowlight } from 'lowlight'
@@ -30,14 +30,34 @@ const editor = new Editor({
     }),
   ],
   content: `<pre><code class="language-javascript">console.log('Hello world!');\n\n// Add some more lines\nconst greeting = 'Welcome to my code editor';\nfunction showMessage(msg) {\n  console.log(msg);\n  return true;\n}\n\nshowMessage(greeting);</code></pre>`,
+  onUpdate: ({ editor }) => {
+    // Schedule line count update after the DOM has been updated
+    nextTick(() => {
+      calculateLineCount();
+    });
+  }
 })
 
 // Calculate line count based on the editor content
 const calculateLineCount = () => {
-  const docElement = document.querySelector('.doc-editor pre code')
-  if (docElement) {
-    const content = docElement.textContent || ''
-    lineCount.value = (content.match(/\n/g) || []).length + 1
+  // Use editor's getText() method which is more reliable than DOM
+  if (editor && editor.state) {
+    const content = editor.getText() || '';
+    const newLineCount = (content.match(/\n/g) || []).length + 1;
+    
+    // Always update line count to ensure reactivity
+    lineCount.value = newLineCount;
+    
+    console.log('Line count:', newLineCount, 'Content length:', content.length);
+  } else {
+    // Fallback to DOM method if editor state isn't available
+    const docElement = document.querySelector('.doc-editor pre code')
+    if (docElement) {
+      const content = docElement.textContent || ''
+      const newLineCount = (content.match(/\n/g) || []).length + 1
+      lineCount.value = newLineCount
+      console.log('DOM Line count:', newLineCount);
+    }
   }
 }
 
@@ -62,6 +82,11 @@ const setupObserver = () => {
   })
 }
 
+// Watch for editor transactions (changes)
+editor.on('transaction', () => {
+  setTimeout(calculateLineCount, 0)
+})
+
 // Adjust editor height on window resize
 const adjustEditorHeight = () => {
   const editorContainer = document.querySelector('.editor-container')
@@ -74,6 +99,11 @@ const adjustEditorHeight = () => {
   }
 }
 
+// Watch for editor content changes
+watch(() => editor.state.doc.toString(), () => {
+  nextTick(calculateLineCount)
+}, { immediate: true })
+
 onMounted(() => {
   adjustEditorHeight()
   window.addEventListener('resize', adjustEditorHeight)
@@ -83,6 +113,14 @@ onMounted(() => {
     calculateLineCount()
     setupObserver()
   }, 100)
+  
+  // Call calculateLineCount regularly to ensure it's updated
+  const intervalId = setInterval(calculateLineCount, 300)
+  
+  // Clear interval on unmount
+  onBeforeUnmount(() => {
+    clearInterval(intervalId)
+  })
 })
 
 onBeforeUnmount(() => {
