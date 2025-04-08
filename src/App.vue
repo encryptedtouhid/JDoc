@@ -1,3 +1,4 @@
+<!-- App.vue -->
 <template>
   <div id="app">
     <DocEditor />
@@ -11,13 +12,19 @@ import DocEditor from './components/DocEditor.vue'
 <style>
 #app {
   font-family: Arial, sans-serif;
-  height: 90vh;
-  width: 94.5vw;
-  margin-left: 1em;
-  margin-right: 1em;
-  margin-top: 1em;
-  margin-bottom: 1em;
+  height: 98vh;
+  width: 100%;
+  padding: 1em;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
 
-  /* padding: 2rem; */
+/* Global styles */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 </style>
