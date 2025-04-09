@@ -38,7 +38,7 @@ jobs:
           zip -r ../jdoc-app-v${{ steps.package-version.outputs.VERSION }}.zip .
           cd ..
       
-      - name: Create release
+      - name: Build and Release
         id: create_release
         uses: actions/create-release@v1
         env:
