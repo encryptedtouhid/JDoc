@@ -1,30 +1,21 @@
-<!-- App.vue -->
 <template>
   <div id="app">
-    <DocEditor />
+    <Toolbar :docTitle="docTitle" @update:title="docTitle = $event" />
+    <DocEditor @update:charCount="charCount = $event" />
+    <StatusBar :count="charCount" />
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
+import Toolbar from './components/Toolbar.vue'
+import StatusBar from './components/StatusBar.vue'
 import DocEditor from './components/DocEditor.vue'
+
+const docTitle = ref('Coding Interview Practice Document')
+const charCount = ref(0)
 </script>
 
 <style>
-#app {
-  font-family: Arial, sans-serif;
-  height: 98vh;
-  width: 100%;
-  padding: 1em;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Global styles */
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
-}
+@import './assets/styles.css'; /* Move shared CSS here */
 </style>
