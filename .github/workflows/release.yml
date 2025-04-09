@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
     
 jobs:
   build-and-release:
@@ -37,15 +37,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      # Auto-increment version
-      - name: Auto-increment version
-        id: version
+      # Extract current version from package.json
+      - name: Get current version
+        id: current_version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      
+      # Build the application with current version
+      - name: Build
+        run: npm run build
+      
+      # Create zip archive with current version
+      - name: Create zip archive
         run: |
-          # Get the current version from package.json
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "Current version: $CURRENT_VERSION"
+          cd dist
+          zip -r ../jdoc-app-v${{ steps.current_version.outputs.VERSION }}.zip .
+          cd ..
+      
+      # Create Release and Upload Asset with current version
+      - name: Create Release and Upload Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Format PR body for release notes (escape newlines and quotes)
+          PR_BODY=$(echo "${{ github.event.pull_request.body || 'No description provided' }}" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           
+          # Create release with gh CLI
+          gh release create v${{ steps.current_version.outputs.VERSION }} \
+            --title "Release v${{ steps.current_version.outputs.VERSION }}" \
+            --notes "Release of JDoc App v${{ steps.current_version.outputs.VERSION }}\n\nChanges in this release:\n${{ github.event.pull_request.title }}\n\n$PR_BODY" \
+            jdoc-app-v${{ steps.current_version.outputs.VERSION }}.zip
+      
+      # Create a new branch for version bump
+      - name: Create version bump branch
+        run: |
           # Split into parts
+          CURRENT_VERSION="${{ steps.current_version.outputs.VERSION }}"
           IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
           MAJOR="${VERSION_PARTS[0]}"
           MINOR="${VERSION_PARTS[1]}"
@@ -54,42 +80,24 @@ jobs:
           # Increment patch version
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          echo "New version: $NEW_VERSION"
+          echo "New version will be: $NEW_VERSION"
+          
+          # Create a new branch for the version bump
+          git checkout -b version-bump-$NEW_VERSION
           
           # Update package.json with new version
           npm version $NEW_VERSION --no-git-tag-version
           
-          # Set output for later steps
-          echo "VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-      
-      # Build the application
-      - name: Build
-        run: npm run build
-      
-      # Create zip archive
-      - name: Create zip archive
-        run: |
-          cd dist
-          zip -r ../jdoc-app-v${{ steps.version.outputs.VERSION }}.zip .
-          cd ..
-      
-      # Commit version bump back to the repository
-      - name: Commit version bump
-        run: |
+          # Commit the changes
           git add package.json package-lock.json
-          git commit -m "Bump version to ${{ steps.version.outputs.VERSION }} [skip ci]"
-          git push origin main
-      
-      # Create Release and Upload Asset
-      - name: Create Release and Upload Asset
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Format PR body for release notes (escape newlines and quotes)
-          PR_BODY=$(echo "${{ github.event.pull_request.body }}" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          git commit -m "Bump version to $NEW_VERSION for next development cycle"
           
-          # Create release with gh CLI
-          gh release create v${{ steps.version.outputs.VERSION }} \
-            --title "Release v${{ steps.version.outputs.VERSION }}" \
-            --notes "Release of JDoc App v${{ steps.version.outputs.VERSION }}\n\nChanges in this release:\n${{ github.event.pull_request.title }}\n\n$PR_BODY" \
-            jdoc-app-v${{ steps.version.outputs.VERSION }}.zip
+          # Push the branch
+          git push origin version-bump-$NEW_VERSION
+          
+          # Create a PR for the version bump
+          gh pr create \
+            --title "Bump version to $NEW_VERSION for next development cycle" \
+            --body "This PR updates the version number to prepare for the next development cycle." \
+            --base main \
+            --head version-bump-$NEW_VERSION
