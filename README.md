@@ -9,12 +9,16 @@ JDoc is a simple document editor with code highlighting, built with Vue 3 and Vi
 - Character count tracking
 - Support for JavaScript, Python, Java, and C++ highlighting
 
+## DEMO
+
+![Live Demo](image.png)
+
+
 ## Project Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/jdoc-app.git
-cd jdoc-app
+git clone https://github.com/encryptedtouhid/JDoc.git
 
 # Install dependencies
 npm install
