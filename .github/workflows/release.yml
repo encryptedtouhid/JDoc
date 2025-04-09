@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
     
 jobs:
   build-and-release:
@@ -93,48 +92,3 @@ jobs:
             --title "Release v$RELEASE_VERSION" \
             --notes "Release of JDoc App v$RELEASE_VERSION" \
             jdoc-app-v$RELEASE_VERSION.zip
-      
-      # Configure Git for creating the version bump branch
-      - name: Configure Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-      
-      # Create a new branch for version bump to next version
-      - name: Create version bump branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Get the version we just released
-          RELEASED_VERSION="${{ steps.check_release.outputs.RELEASE_VERSION }}"
-          
-          # Split into parts
-          IFS='.' read -r -a VERSION_PARTS <<< "$RELEASED_VERSION"
-          MAJOR="${VERSION_PARTS[0]}"
-          MINOR="${VERSION_PARTS[1]}"
-          PATCH="${VERSION_PARTS[2]}"
-          
-          # Increment patch version for next development cycle
-          NEXT_PATCH=$((PATCH + 1))
-          NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
-          echo "Next development version will be: $NEXT_VERSION"
-          
-          # Create a new branch for the version bump
-          git checkout -b version-bump-$NEXT_VERSION
-          
-          # Update package.json with new version
-          npm version $NEXT_VERSION --no-git-tag-version
-          
-          # Commit the changes
-          git add package.json package-lock.json
-          git commit -m "Bump version to $NEXT_VERSION for next development cycle"
-          
-          # Push the branch
-          git push origin version-bump-$NEXT_VERSION
-          
-          # Create a PR for the version bump
-          gh pr create \
-            --title "Bump version to $NEXT_VERSION for next development cycle" \
-            --body "This PR updates the version number to prepare for the next development cycle." \
-            --base main \
-            --head version-bump-$NEXT_VERSION
