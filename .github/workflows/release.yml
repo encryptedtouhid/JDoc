@@ -1,8 +1,7 @@
 name: Build and Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
       - main
 
@@ -12,30 +11,14 @@ permissions:
     
 jobs:
   build-and-release:
-    # Only run when PR is merged (not when just closed without merging)
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # We need full history for versioning
+          fetch-depth: 0
       
-      - name: Debug PR information
-        run: |
-          echo "PR Base Branch: ${{ github.event.pull_request.base.ref }}"
-          echo "PR Head Branch: ${{ github.event.pull_request.head.ref }}"
-          echo "PR Merged: ${{ github.event.pull_request.merged }}"
-          echo "PR Title: ${{ github.event.pull_request.title }}"
-          echo "PR State: ${{ github.event.pull_request.state }}"
-      
-      # Configure Git
-      - name: Configure Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -66,17 +49,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Format PR body for release notes (escape newlines and quotes)
-          PR_BODY=$(echo "${{ github.event.pull_request.body || 'No description provided' }}" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-          
           # Create release with gh CLI
           gh release create v${{ steps.current_version.outputs.VERSION }} \
             --title "Release v${{ steps.current_version.outputs.VERSION }}" \
-            --notes "Release of JDoc App v${{ steps.current_version.outputs.VERSION }}\n\nChanges in this release:\n${{ github.event.pull_request.title }}\n\n$PR_BODY" \
+            --notes "Release of JDoc App v${{ steps.current_version.outputs.VERSION }}" \
             jdoc-app-v${{ steps.current_version.outputs.VERSION }}.zip
+      
+      # Configure Git for creating the version bump branch
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
       
       # Create a new branch for version bump
       - name: Create version bump branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Split into parts
           CURRENT_VERSION="${{ steps.current_version.outputs.VERSION }}"
