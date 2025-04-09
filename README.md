@@ -1,4 +1,4 @@
-# JDoc - Code Document Editor
+# JDoc - Just Code Editor 
 
 JDoc is a simple document editor with code highlighting, built with Vue 3 and Vite.
 
