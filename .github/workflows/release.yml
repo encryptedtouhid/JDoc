@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-and-release:
     # Only run when PR is merged (not when just closed without merging)
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'dev'
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     
     steps:
@@ -21,6 +21,14 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # We need full history for versioning
+      
+      - name: Debug PR information
+        run: |
+          echo "PR Base Branch: ${{ github.event.pull_request.base.ref }}"
+          echo "PR Head Branch: ${{ github.event.pull_request.head.ref }}"
+          echo "PR Merged: ${{ github.event.pull_request.merged }}"
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR State: ${{ github.event.pull_request.state }}"
       
       # Configure Git
       - name: Configure Git
