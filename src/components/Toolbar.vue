@@ -7,7 +7,8 @@
           class="doc-title" 
           :value="docTitle" 
           @input="updateTitle" 
-          readonly 
+          @blur="onTitleBlur"
+          @focus="onTitleFocus"
           placeholder="Untitled document"
         >
         <div class="doc-path">Coding Interview > {{ docTitle }}</div>
@@ -44,5 +45,20 @@ const emit = defineEmits(['update:docTitle']);
 
 const updateTitle = (event) => {
   emit('update:docTitle', event.target.value);
+};
+
+const onTitleFocus = (event) => {
+  // Add a CSS class to indicate the title is being edited
+  event.target.classList.add('editing');
+};
+
+const onTitleBlur = (event) => {
+  // Remove the editing class
+  event.target.classList.remove('editing');
+  
+  // If title is empty, reset to a default
+  if (!event.target.value.trim()) {
+    emit('update:docTitle', 'Untitled document');
+  }
 };
 </script>

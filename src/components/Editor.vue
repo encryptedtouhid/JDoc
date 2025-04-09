@@ -45,6 +45,12 @@ const highlightCode = () => {
 watch(() => props.code, (newCode) => {
   if (codeEditor.value && newCode !== codeEditor.value.innerText) {
     codeEditor.value.innerText = newCode;
+    
+    // When code is restored from localStorage or changed externally,
+    // make sure we highlight it properly
+    setTimeout(() => {
+      highlightCode();
+    }, 0);
   }
 }, { immediate: true });
 
