@@ -49,28 +49,25 @@ jobs:
           MINOR="${VERSION_PARTS[1]}"
           PATCH="${VERSION_PARTS[2]}"
           
-          # Check if the release already exists
-          RELEASE_EXISTS=$(gh release view v$BASE_VERSION 2>/dev/null && echo "true" || echo "false")
-          echo "Release v$BASE_VERSION exists: $RELEASE_EXISTS"
+          # Initialize variables
+          NEW_PATCH=$PATCH
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
           
-          # If release exists, increment patch until we find a version that doesn't exist
-          if [ "$RELEASE_EXISTS" = "true" ]; then
-            echo "Release v$BASE_VERSION already exists. Finding next available version..."
-            NEW_PATCH=$PATCH
-            NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          # Use a safer method to check if release exists
+          echo "Checking if release v$NEW_VERSION exists..."
+          if gh release view v$NEW_VERSION &>/dev/null; then
+            echo "Release v$NEW_VERSION exists. Finding next available version..."
             
-            while gh release view v$NEW_VERSION 2>/dev/null; do
-              echo "Release v$NEW_VERSION also exists, incrementing..."
+            # Keep incrementing until we find an unused version
+            while gh release view v$NEW_VERSION &>/dev/null; do
+              echo "Release v$NEW_VERSION exists, incrementing..."
               NEW_PATCH=$((NEW_PATCH + 1))
               NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
             done
-            
-            echo "Next available version: v$NEW_VERSION"
-            echo "RELEASE_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "Release v$BASE_VERSION does not exist yet. Using this version."
-            echo "RELEASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
           fi
+          
+          echo "Using version: v$NEW_VERSION"
+          echo "RELEASE_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
       
       # Build the application
       - name: Build
