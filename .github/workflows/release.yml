@@ -33,27 +33,69 @@ jobs:
         id: current_version
         run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
       
-      # Build the application with current version
+      # Check if release already exists and find next available version
+      - name: Check existing releases
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the base version from package.json
+          BASE_VERSION="${{ steps.current_version.outputs.VERSION }}"
+          echo "Base version from package.json: $BASE_VERSION"
+          
+          # Split into parts
+          IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
+          MAJOR="${VERSION_PARTS[0]}"
+          MINOR="${VERSION_PARTS[1]}"
+          PATCH="${VERSION_PARTS[2]}"
+          
+          # Check if the release already exists
+          RELEASE_EXISTS=$(gh release view v$BASE_VERSION 2>/dev/null && echo "true" || echo "false")
+          echo "Release v$BASE_VERSION exists: $RELEASE_EXISTS"
+          
+          # If release exists, increment patch until we find a version that doesn't exist
+          if [ "$RELEASE_EXISTS" = "true" ]; then
+            echo "Release v$BASE_VERSION already exists. Finding next available version..."
+            NEW_PATCH=$PATCH
+            NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+            
+            while gh release view v$NEW_VERSION 2>/dev/null; do
+              echo "Release v$NEW_VERSION also exists, incrementing..."
+              NEW_PATCH=$((NEW_PATCH + 1))
+              NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+            done
+            
+            echo "Next available version: v$NEW_VERSION"
+            echo "RELEASE_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Release v$BASE_VERSION does not exist yet. Using this version."
+            echo "RELEASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
+          fi
+      
+      # Build the application
       - name: Build
         run: npm run build
       
-      # Create zip archive with current version
+      # Create zip archive with release version
       - name: Create zip archive
         run: |
           cd dist
-          zip -r ../jdoc-app-v${{ steps.current_version.outputs.VERSION }}.zip .
+          zip -r ../jdoc-app-v${{ steps.check_release.outputs.RELEASE_VERSION }}.zip .
           cd ..
       
-      # Create Release and Upload Asset with current version
+      # Create Release and Upload Asset
       - name: Create Release and Upload Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create release with gh CLI
-          gh release create v${{ steps.current_version.outputs.VERSION }} \
-            --title "Release v${{ steps.current_version.outputs.VERSION }}" \
-            --notes "Release of JDoc App v${{ steps.current_version.outputs.VERSION }}" \
-            jdoc-app-v${{ steps.current_version.outputs.VERSION }}.zip
+          RELEASE_VERSION="${{ steps.check_release.outputs.RELEASE_VERSION }}"
+          echo "Creating release for version: v$RELEASE_VERSION"
+          
+          gh release create v$RELEASE_VERSION \
+            --title "Release v$RELEASE_VERSION" \
+            --notes "Release of JDoc App v$RELEASE_VERSION" \
+            jdoc-app-v$RELEASE_VERSION.zip
       
       # Configure Git for creating the version bump branch
       - name: Configure Git
@@ -61,39 +103,41 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
       
-      # Create a new branch for version bump
+      # Create a new branch for version bump to next version
       - name: Create version bump branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Get the version we just released
+          RELEASED_VERSION="${{ steps.check_release.outputs.RELEASE_VERSION }}"
+          
           # Split into parts
-          CURRENT_VERSION="${{ steps.current_version.outputs.VERSION }}"
-          IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
+          IFS='.' read -r -a VERSION_PARTS <<< "$RELEASED_VERSION"
           MAJOR="${VERSION_PARTS[0]}"
           MINOR="${VERSION_PARTS[1]}"
           PATCH="${VERSION_PARTS[2]}"
           
-          # Increment patch version
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          echo "New version will be: $NEW_VERSION"
+          # Increment patch version for next development cycle
+          NEXT_PATCH=$((PATCH + 1))
+          NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
+          echo "Next development version will be: $NEXT_VERSION"
           
           # Create a new branch for the version bump
-          git checkout -b version-bump-$NEW_VERSION
+          git checkout -b version-bump-$NEXT_VERSION
           
           # Update package.json with new version
-          npm version $NEW_VERSION --no-git-tag-version
+          npm version $NEXT_VERSION --no-git-tag-version
           
           # Commit the changes
           git add package.json package-lock.json
-          git commit -m "Bump version to $NEW_VERSION for next development cycle"
+          git commit -m "Bump version to $NEXT_VERSION for next development cycle"
           
           # Push the branch
-          git push origin version-bump-$NEW_VERSION
+          git push origin version-bump-$NEXT_VERSION
           
           # Create a PR for the version bump
           gh pr create \
-            --title "Bump version to $NEW_VERSION for next development cycle" \
+            --title "Bump version to $NEXT_VERSION for next development cycle" \
             --body "This PR updates the version number to prepare for the next development cycle." \
             --base main \
-            --head version-bump-$NEW_VERSION
+            --head version-bump-$NEXT_VERSION
