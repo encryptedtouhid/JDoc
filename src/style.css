@@ -279,3 +279,7 @@ code {
 .icon-button:hover {
   background-color: var(--google-gray-100);
 }
+
+.save-button {
+  color: #5F6367;
+}
