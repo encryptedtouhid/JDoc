@@ -1,10 +1,27 @@
 <template>
   <div class="app-container">
-    <Toolbar :docTitle="docTitle" @update:docTitle="updateTitle" />
-    <Editor 
-      :code="code" 
-      @update:code="updateCode" 
-      ref="editorComponent" 
+    <Toolbar
+        :docTitle="docTitle"
+        @update:docTitle="updateTitle"
+        @save-document="triggerSave"
+    />
+
+    <!-- Save Filename Popup -->
+    <div v-if="showFilenameInput" class="filename-prompt">
+      <input
+          v-model="filename"
+          @keyup.enter="confirmSave"
+          class="filename-input"
+          placeholder="Enter filename (e.g. notes.txt)"
+          autofocus
+      />
+      <button class="button primary" @click="confirmSave">Save</button>
+    </div>
+
+    <Editor
+        :code="code"
+        @update:code="updateCode"
+        ref="editorComponent"
     />
     <StatusBar :characterCount="characterCount" />
   </div>
@@ -23,7 +40,6 @@ const DEFAULT_CODE = `/**
  */
 function solution() {
     // Your code here
-    
 }`;
 
 // State refs
@@ -31,37 +47,53 @@ const docTitle = ref(DEFAULT_TITLE);
 const code = ref('');
 const editorComponent = ref(null);
 
-const characterCount = computed(() => {
-  return code.value.length;
-});
+const characterCount = computed(() => code.value.length);
 
+// 🔽 Save Dialog States
+const showFilenameInput = ref(false);
+const filename = ref('document.txt');
+
+const triggerSave = () => {
+  showFilenameInput.value = true;
+};
+
+const confirmSave = () => {
+  if (!filename.value.trim()) return;
+
+  const blob = new Blob([code.value], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename.value.trim();
+  link.click();
+  URL.revokeObjectURL(link.href);
+
+  showFilenameInput.value = false;
+};
+
+// 🔽 Title and Code Update
 const updateTitle = (newTitle) => {
   docTitle.value = newTitle;
-  // Save to localStorage whenever the title changes
   saveToLocalStorage();
 };
 
 const updateCode = (newCode) => {
   code.value = newCode;
-  // Save to localStorage whenever the code changes
   saveToLocalStorage();
 };
 
-// Local storage functions
+// 🔽 Local Storage Save/Load
 const saveToLocalStorage = () => {
   const documentState = {
     title: docTitle.value,
     code: code.value,
     lastModified: new Date().toISOString()
   };
-  
   localStorage.setItem('jdoc-document-state', JSON.stringify(documentState));
 };
 
 const loadFromLocalStorage = () => {
   try {
     const savedState = localStorage.getItem('jdoc-document-state');
-    
     if (savedState) {
       const parsedState = JSON.parse(savedState);
       docTitle.value = parsedState.title || DEFAULT_TITLE;
@@ -72,33 +104,46 @@ const loadFromLocalStorage = () => {
   } catch (error) {
     console.error('Error loading from localStorage:', error);
   }
-  
   return false;
 };
 
 onMounted(() => {
-  // Try to load from localStorage first
   const loaded = loadFromLocalStorage();
-  
-  // If nothing was loaded, initialize with the template
-  if (!loaded) {
-    code.value = DEFAULT_CODE;
-  }
-  
-  // Set up beforeunload handler to save before the page is closed
-  window.addEventListener('beforeunload', () => {
-    saveToLocalStorage();
-  });
-  
-  // Also save periodically (every 30 seconds)
-  const autoSaveInterval = setInterval(() => {
-    saveToLocalStorage();
-  }, 30000);
-  
-  // Clean up when component is unmounted
+  if (!loaded) code.value = DEFAULT_CODE;
+
+  // Save on page unload
+  window.addEventListener('beforeunload', () => saveToLocalStorage());
+
+  const autoSaveInterval = setInterval(saveToLocalStorage, 30000);
+
   onUnmounted(() => {
     clearInterval(autoSaveInterval);
     window.removeEventListener('beforeunload', saveToLocalStorage);
   });
 });
 </script>
+
+<style scoped>
+.filename-prompt {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 16px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  z-index: 1000;
+  align-items: center;
+}
+
+.filename-input {
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--google-gray-300);
+  border-radius: 4px;
+  min-width: 240px;
+}
+</style>
